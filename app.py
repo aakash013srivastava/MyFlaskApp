@@ -1,11 +1,11 @@
 from flask import Flask,render_template,flash,redirect,url_for,request,session,logging
-from data import Articles
+#from data import Articles
 from flask_mysqldb import MySQL
 from wtforms import Form,StringField,TextAreaField,PasswordField,validators
 from passlib.hash import sha256_crypt
 from functools import wraps
 
-Articles = Articles()
+#Articles = Articles()
 
 app = Flask(__name__)
 
@@ -30,12 +30,33 @@ def about():
 
 @app.route('/articles')
 def articles():
-    return render_template('articles.html',articles = Articles)
+     # Create cursor
+    cur = mysql.connection.cursor()
+    # Get Articles
+    result = cur.execute("SELECT * FROM articles")
+    
+    articles = cur.fetchall()
+
+    if result > 0:
+        return render_template('articles.html',articles=articles)
+    else:
+        msg = "No Articles found"
+        return render_template('articles.html',msg=msg)
+    # Close connection
+    cur.close() 
 
 @app.route('/article/<string:id>/')
 def article(id):
-    return render_template('article.html',id = id)
+    # Create cursor
+    cur = mysql.connection.cursor()
+    # Get Article
+    result = cur.execute("SELECT * FROM articles WHERE id = %s",(id))
+    
+    article = cur.fetchone()
 
+    return render_template('article.html',article=article)
+
+# User Registration form
 class RegisterForm(Form):
     name = StringField('Name',[validators.Length(min=1,max=50)])
     username = StringField('Username',[validators.Length(min=3,max=25)])
@@ -114,16 +135,63 @@ def is_logged_in(f):
             flash('Unauthorized,Please Login','danger')
             return redirect(url_for('login'))
     return wrap
+
 @app.route('/logout')
+@is_logged_in
 def logout():
     session.clear()
     flash('You are now logged out','success')
     return redirect(url_for('login'))
 
+# User dashboard
 @app.route('/dashboard')
 @is_logged_in
 def dashboard():
+    # Create cursor
+    cur = mysql.connection.cursor()
+    # Get Articles
+    result = cur.execute("SELECT * FROM articles")
+    
+    articles = cur.fetchall()
+
+    if result > 0:
+        return render_template('dashboard.html',articles=articles)
+    else:
+        msg = "No Articles found"
+        return render_template('dashboard.html',msg=msg)
+    # Close connection
+    cur.close() 
+
     return render_template('dashboard.html')
+
+# Add Article form
+class AddArticleForm(Form):
+    title = StringField('Title',[validators.Length(min=5,max=200)])
+    body = TextAreaField('Body',[validators.Length(min=30)])
+    
+# Add Article
+@app.route('/add_article',methods = ['GET','POST'])
+@is_logged_in
+def add_article():
+    form = AddArticleForm(request.form)
+    if request.method == 'POST' and form.validate():
+        title = form.title.data
+        body = form.body.data
+
+        # Create Aursor
+        cur = mysql.connection.cursor()
+        # Execute
+        cur.execute("INSERT into articles(title,body,author) VALUES(%s,%s,%s)",(title,body,session['username']))
+        # Commit
+        mysql.connection.commit()
+        #Close connection
+        cur.close()
+
+        flash('Article Created','success')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('add_article.html',form = form)
 
 if __name__=='__main__':
     app.secret_key = 'secret123'
