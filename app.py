@@ -96,7 +96,6 @@ def login():
                 return redirect(url_for('dashboard'))
             else:
                 error = "Invalid login"
-                return redirect(url_for('dashboard'))
                 return render_template('login.html',error=error)
             cur.close()
         else:
@@ -114,7 +113,7 @@ def is_logged_in(f):
         else:
             flash('Unauthorized,Please Login','danger')
             return redirect(url_for('login'))
-
+    return wrap
 @app.route('/logout')
 def logout():
     session.clear()
@@ -122,6 +121,7 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
+@is_logged_in
 def dashboard():
     return render_template('dashboard.html')
 
